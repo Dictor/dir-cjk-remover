@@ -137,43 +137,47 @@ func main() {
 			return nil
 		}
 
-		for {
-			var complete = true
-			err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
-				if err != nil {
-					printDetail("Error: %s - %s\n", path, err)
-					return err
-				}
-				newpath := getDuplicatePath(path, RemoveCharacter(langFlags, path))
-
-				if newpath != path {
-					if err := os.Rename(path, newpath); err != nil {
-						printDetail("Error: %s - %s\n", path, err)
-					} else {
-						printDetail("Change: %s → %s", path, newpath)
-						if info.IsDir() {
-							if path == dir {
-								dir = newpath
-							}
-							complete = false
-							return errors.New("Retry")
-						}
-					}
-				}
-				return nil
-			})
-			if complete {
-				break
-			} else if err != nil && err.Error() != "Retry" {
-				break
-			}
-		}
+		Process(dir, langFlags)
 		return nil
 	}
 
 	err := app.Run(os.Args)
 	if err != nil {
 		log.Fatal(err)
+	}
+}
+
+func Process(dir string, lang map[string]bool) {
+	for {
+		var complete = true
+		err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				printDetail("Error: %s - %s\n", path, err)
+				return err
+			}
+			newpath := getDuplicatePath(path, RemoveCharacter(lang, path))
+
+			if newpath != path {
+				if err := os.Rename(path, newpath); err != nil {
+					printDetail("Error: %s - %s\n", path, err)
+				} else {
+					printDetail("Change: %s → %s", path, newpath)
+					if info.IsDir() {
+						if path == dir {
+							dir = newpath
+						}
+						complete = false
+						return errors.New("Retry")
+					}
+				}
+			}
+			return nil
+		})
+		if complete {
+			break
+		} else if err != nil && err.Error() != "Retry" {
+			break
+		}
 	}
 }
 
