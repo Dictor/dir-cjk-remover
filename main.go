@@ -1,9 +1,12 @@
 package main
 
 import (
+	"errors"
 	"github.com/urfave/cli/v2"
 	"log"
 	"os"
+	"path/filepath"
+	"strconv"
 )
 
 var unicodeAddress map[string]([][]int) = map[string]([][]int){
@@ -45,14 +48,24 @@ var unicodeAddress map[string]([][]int) = map[string]([][]int){
 		{0xfe50, 0xfe6f},
 		{0xffe0, 0xffef},
 	},
-	"common-extension": { //rare common characters
+	"common-ext": { //rare common characters
 		{0x20000, 0x2fa1f},
 		{0x30000, 0x3134f},
 	},
 }
 
+var (
+	printMode   bool
+	replaceChar string
+)
+
 func main() {
-	app := &cli.App{Name: "CJK character Remover in directory (with files) name"}
+	app := &cli.App{
+		Name:    "dir-cjk-remover",
+		Usage:   "CJK character Remover in directory (with files) name",
+		Version: "1.0",
+		Authors: []*cli.Author{{Name: "Dictor", Email: "kimdictor@gmail.com"}},
+	}
 	app.UseShortOptionHandling = true
 	app.Flags = []cli.Flag{
 		&cli.BoolFlag{
@@ -71,20 +84,107 @@ func main() {
 			Usage:   "Remove all 'hangul' characters",
 		},
 		&cli.BoolFlag{
-			Name:    "print",
-			Aliases: []string{"v", "p"},
-			Usage:   "Print every tasking directory",
+			Name:    "common",
+			Aliases: []string{"o"},
+			Usage:   "Remove all 'common CJK' characters",
+		},
+		&cli.BoolFlag{
+			Name:    "commone",
+			Aliases: []string{"e"},
+			Usage:   "Remove all 'common extension CJK' characters",
+		},
+		&cli.BoolFlag{
+			Name:        "silence",
+			Aliases:     []string{"s"},
+			Usage:       "Disable detail tasking log",
+			Destination: &printMode,
+			Value:       false,
+		},
+		&cli.StringFlag{
+			Name:     "path",
+			Aliases:  []string{"p"},
+			Usage:    "Directory for processing",
+			Required: true,
+		},
+		&cli.StringFlag{
+			Name:    "replace",
+			Aliases: []string{"r"},
+			Usage:   "Set replacing character",
+			Value:   "_",
 		},
 	}
 
 	app.Action = func(ctx *cli.Context) error {
 		var (
-			c = ctx.Bool("chinese")
-			j = ctx.Bool("japanese")
-			k = ctx.Bool("korean")
-			v = ctx.Bool("print")
+			langFlags map[string]bool = map[string]bool{
+				"hanga":      ctx.Bool("chinese"),
+				"japanese":   ctx.Bool("japanese"),
+				"hangul":     ctx.Bool("korean"),
+				"common":     ctx.Bool("common"),
+				"common-ext": ctx.Bool("commone"),
+			}
+			dir = ctx.String("path")
 		)
-		log.Printf("removing option: c=%t j=%t k=%t", c, j, k)
+
+		var noFlag bool = true
+		for _, f := range langFlags {
+			if f {
+				noFlag = false
+			}
+		}
+		if noFlag {
+			log.Printf("No character flag passed! Let's see 'dir-cjk-remover --help'")
+			return nil
+		}
+
+		for {
+			var complete = true
+			err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+				if err != nil {
+					printDetail("Error: %s - %s\n", path, err)
+					return err
+				}
+
+				newpath := RemoveCharacter(langFlags, path)
+				newpathpost := ""
+				for {
+					if getFinalPath(newpath, newpathpost) == path {
+						break
+					}
+					if _, err := os.Stat(getFinalPath(newpath, newpathpost)); err == nil {
+						if newpathpost == "" {
+							newpathpost = strconv.Itoa(1)
+						} else {
+							i, _ := strconv.Atoi(newpathpost)
+							newpathpost = strconv.Itoa(i + 1)
+						}
+					} else {
+						break
+					}
+				}
+
+				if getFinalPath(newpath, newpathpost) != path {
+					if err := os.Rename(path, getFinalPath(newpath, newpathpost)); err != nil {
+						printDetail("Error: %s - %s\n", path, err)
+					} else {
+						printDetail("Change: %s → %s", path, getFinalPath(newpath, newpathpost))
+						if info.IsDir() {
+							if path == dir {
+								dir = getFinalPath(newpath, newpathpost)
+							}
+							complete = false
+							return errors.New("Retry")
+						}
+					}
+				}
+				return nil
+			})
+			if complete {
+				break
+			} else if err != nil && err.Error() != "Retry" {
+				break
+			}
+		}
 		return nil
 	}
 
@@ -94,8 +194,43 @@ func main() {
 	}
 }
 
-func remove(s string) {
-	for _, r := range s {
-
+func getFinalPath(path, post string) string {
+	if post == "" {
+		return path
+	} else {
+		return path + " (" + post + ")"
 	}
+}
+
+func printDetail(format string, param ...interface{}) {
+	if !printMode {
+		log.Printf(format, param...)
+	}
+}
+
+func RemoveCharacter(flag map[string]bool, s string) string {
+	for idx, b := range flag {
+		if b {
+			var rs string
+			for _, r := range s {
+				if !hasCharacter(idx, r) {
+					rs += string(r)
+				} else {
+					rs += "_"
+				}
+			}
+			s = rs
+		}
+	}
+	return s
+}
+
+func hasCharacter(index string, s rune) bool {
+	for i := 0; i < len(unicodeAddress[index]); i++ {
+		var ci []int = unicodeAddress[index][i]
+		if int32(s) >= int32(ci[0]) && int32(s) <= int32(ci[1]) {
+			return true
+		}
+	}
+	return false
 }
