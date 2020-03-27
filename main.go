@@ -144,33 +144,16 @@ func main() {
 					printDetail("Error: %s - %s\n", path, err)
 					return err
 				}
+				newpath := getDuplicatePath(path, RemoveCharacter(langFlags, path))
 
-				newpath := RemoveCharacter(langFlags, path)
-				newpathpost := ""
-				for {
-					if getFinalPath(newpath, newpathpost) == path {
-						break
-					}
-					if _, err := os.Stat(getFinalPath(newpath, newpathpost)); err == nil {
-						if newpathpost == "" {
-							newpathpost = strconv.Itoa(1)
-						} else {
-							i, _ := strconv.Atoi(newpathpost)
-							newpathpost = strconv.Itoa(i + 1)
-						}
-					} else {
-						break
-					}
-				}
-
-				if getFinalPath(newpath, newpathpost) != path {
-					if err := os.Rename(path, getFinalPath(newpath, newpathpost)); err != nil {
+				if newpath != path {
+					if err := os.Rename(path, newpath); err != nil {
 						printDetail("Error: %s - %s\n", path, err)
 					} else {
-						printDetail("Change: %s → %s", path, getFinalPath(newpath, newpathpost))
+						printDetail("Change: %s → %s", path, newpath)
 						if info.IsDir() {
 							if path == dir {
-								dir = getFinalPath(newpath, newpathpost)
+								dir = newpath
 							}
 							complete = false
 							return errors.New("Retry")
@@ -194,7 +177,27 @@ func main() {
 	}
 }
 
-func getFinalPath(path, post string) string {
+func getDuplicatePath(path, newpath string) string {
+	var newpathpost = ""
+	for {
+		if getPostfixPath(newpath, newpathpost) == path {
+			break
+		}
+		if _, err := os.Stat(getPostfixPath(newpath, newpathpost)); err == nil {
+			if newpathpost == "" {
+				newpathpost = strconv.Itoa(1)
+			} else {
+				i, _ := strconv.Atoi(newpathpost)
+				newpathpost = strconv.Itoa(i + 1)
+			}
+		} else {
+			break
+		}
+	}
+	return getPostfixPath(newpath, newpathpost)
+}
+
+func getPostfixPath(path, post string) string {
 	if post == "" {
 		return path
 	} else {
