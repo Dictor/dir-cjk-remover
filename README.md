@@ -22,8 +22,9 @@ GLOBAL OPTIONS:
    --version, -v              print the version (default: false)
 ```
 ## Example
+Below tree is original directory structure.
 ```
-test681155894
+t
 ├── わら
 ├── ㅋㅋㅋ
 ├── 哈哈哈
@@ -35,6 +36,21 @@ test681155894
         ├── ㅋ?
         └── 哈!
 ```
+After launch dir-cjk-remover with proper option,
 ```
-./dir-cjk-remover -cjkoe -p ./test681155894  
+./dir-cjk-remover -cj -p t
+```
+it modify directory like below.
+```
+t
+├── __
+├── ___
+├── ㅋㅋㅋ
+└── 오잉
+    ├── __
+    ├── ____
+    ├── 졸리다
+    └── 헐
+        ├── _!
+        └── ㅋ?
 ```
