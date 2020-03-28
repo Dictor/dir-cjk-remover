@@ -117,7 +117,7 @@ func main() {
 	app.Action = func(ctx *cli.Context) error {
 		var (
 			langFlags map[string]bool = map[string]bool{
-				"hanga":      ctx.Bool("chinese"),
+				"hanja":      ctx.Bool("chinese"),
 				"japanese":   ctx.Bool("japanese"),
 				"hangul":     ctx.Bool("korean"),
 				"common":     ctx.Bool("common"),
